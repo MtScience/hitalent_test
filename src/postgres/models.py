@@ -2,7 +2,7 @@ import datetime as dt
 from sqlalchemy import ForeignKey, String, DateTime, Date, func, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.dto.dto import DepartmentDTO, EmployeeDTO
+from src.dto import DepartmentDTO, EmployeeDTO
 from src.postgres.base import Base
 
 

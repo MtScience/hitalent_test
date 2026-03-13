@@ -4,8 +4,8 @@ from typing import Literal
 from sqlalchemy import select, update, exists, delete, insert, literal_column, CTE
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.errors import NonexistentDepartmentError, NothingToUpdate
-from src.dto.dto import DepartmentDTO, EmployeeDTO, SubdepartmentsDTO
+from src.dto import DepartmentDTO, EmployeeDTO, SubdepartmentsDTO
+from src.errors import NonexistentDepartmentError, NothingToUpdate, DepartmentLoop
 from src.postgres.models import Department, Employee
 
 
@@ -28,6 +28,7 @@ def _create_department_subtree_ids_cte(id: int) -> CTE:
     )
 
     return dept_cte
+
 
 async def create_department(
     session: AsyncSession,
@@ -66,7 +67,7 @@ async def update_department(
             subdept_ids_query = select(subdept_cte.c.id)
             subdept_ids = (await session.scalars(subdept_ids_query)).all()
             if parent_id in subdept_ids:
-                raise ValueError("Cannot make a department its own subdepartment.")
+                raise DepartmentLoop
 
             values = {"parent_id": parent_id}
             if name:
@@ -141,25 +142,29 @@ async def delete_department(
     mode: Literal["cascade", "reassign"],
     reassign_to: int | None = None,
 ) -> None:
+    dept_cte = _create_department_subtree_ids_cte(id)
+    dept_ids_subquery = select(dept_cte.c.id)
+
     if mode == "reassign":
+        subdept_ids = (await session.scalars(dept_ids_subquery)).all()
+        if reassign_to in subdept_ids:
+            raise DepartmentLoop
+
         queries = [
             update(Employee).values(department_id=reassign_to).where(Employee.department_id == id),
             update(Department).values(parent_id=reassign_to).where(Department.parent_id == id),
             delete(Department).where(Department.id == id),
         ]
-        for query in queries:
-            await session.execute(query)
     elif mode == "cascade":
-        dept_cte = _create_department_subtree_ids_cte(id)
-        dept_ids_subquery = select(dept_cte.c.id)
         queries = [
             delete(Employee).where(Employee.department_id.in_(dept_ids_subquery)),
             delete(Department).where(Department.id.in_(dept_ids_subquery)),
         ]
-        for query in queries:
-            await session.execute(query)
     else:
         raise ValueError("Invalid mode")
+
+    for query in queries:
+        await session.execute(query)
 
 
 async def get_subdepartments(
@@ -197,5 +202,4 @@ async def get_subdepartments(
     )
 
     subdepartments = (await session.scalars(query)).all()
-
     return [subdept.to_dto() for subdept in subdepartments]

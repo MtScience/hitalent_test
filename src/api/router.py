@@ -1,9 +1,9 @@
 from dataclasses import asdict
 from fastapi import APIRouter, Query, Depends, Response, status
-from typing import Annotated, Literal
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
-from src.errors import NonexistentDepartmentError, NothingToUpdate
+from src.errors import NonexistentDepartmentError, NothingToUpdate, DepartmentLoop
 from src.postgres.base import get_async_session
 from src.api.models import (
     CreateDepartment,
@@ -13,6 +13,7 @@ from src.api.models import (
     EmployeeResponse,
     DepartmentRetrievalResponse,
 )
+from src.api.validation import DeletionQueryParams
 import src.postgres.queries as queries
 
 router = APIRouter()
@@ -84,9 +85,8 @@ async def update_department(
         return DepartmentResponse(**asdict(data))
     except NothingToUpdate:
         return Response(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
-    except ValueError:
+    except DepartmentLoop:
         return Response(status_code=status.HTTP_409_CONFLICT)
-
 
 
 @router.delete(
@@ -96,10 +96,11 @@ async def update_department(
 async def delete_department(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     id: int,
-    mode: Literal["cascade", "reassign"],
-    reassign_to_department_id: int | None = None,
+    params: Annotated[DeletionQueryParams, Query()]
 ):
     try:
-        await queries.delete_department(session, id, mode, reassign_to_department_id)
+        await queries.delete_department(session, id, params.mode, params.reassign_id)
+    except DepartmentLoop:
+        return Response(status_code=status.HTTP_409_CONFLICT)
     except ValueError:
         return Response(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)

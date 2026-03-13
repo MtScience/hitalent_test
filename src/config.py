@@ -1,7 +1,5 @@
-from typing import Optional
-
 from dotenv import find_dotenv, load_dotenv
-from pydantic import PostgresDsn, ValidationInfo, computed_field
+from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings
 
 load_dotenv(find_dotenv(), override=True)
