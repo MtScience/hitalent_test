@@ -8,9 +8,12 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi",
     "pydantic",
+    "pydantic-settings",
     "uvicorn",
     "sqlalchemy",
     "asyncpg",
+    "alembic",
+    "python-dotenv",
 ]
 
 

@@ -1,18 +1,28 @@
 import datetime as dt
-from sqlalchemy import ForeignKey, String, DateTime, Date
+from sqlalchemy import ForeignKey, String, DateTime, Date, func, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from base import Base
+from src.dto.dto import DepartmentDTO, EmployeeDTO
+from src.postgres.base import Base
 
 
 class Department(Base):
     __tablename__ = "departments"
+    __table_args__ = (
+        CheckConstraint("parent_id <> id"),
+        UniqueConstraint("parent_id", "name"),
+    )
 
-    # TODO: Обеспечить уникальность имени для parent_id
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     parent_id: Mapped[int] = mapped_column(ForeignKey("departments.id"), nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        insert_default=func.now()
+    )
+
+    def to_dto(self) -> DepartmentDTO:
+        return DepartmentDTO(**self.as_dict())
 
 
 class Employee(Base):
@@ -23,4 +33,11 @@ class Employee(Base):
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     position: Mapped[str] = mapped_column(String(200), nullable=False)
     hired_at: Mapped[dt.date] = mapped_column(Date, nullable=True)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        insert_default=func.now()
+    )
+
+    def to_dto(self) -> EmployeeDTO:
+        return EmployeeDTO(**self.as_dict())

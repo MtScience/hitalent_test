@@ -13,9 +13,10 @@ COPY pyproject.toml poetry.lock ./
 
 RUN poetry install
 
-COPY main.py ./
+COPY main.py alembic.ini ./
+COPY ./alembic ./alembic
 COPY ./src ./src
 
 EXPOSE 8000
 
-CMD [""]
+CMD ["/bin/bash", "-c", "poetry run alembic upgrade head && poetry run uvicorn main:app --port 8000 --host 0.0.0.0"]
